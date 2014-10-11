@@ -1,14 +1,10 @@
 package xyz.rjs.brandwatch.supermarkets.sim;
 
+import xyz.rjs.brandwatch.supermarkets.model.events.ClockTick;
+
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.AbstractIdleService;
-import org.jfairy.Fairy;
-import org.jfairy.producer.person.Person;
-import xyz.rjs.brandwatch.supermarkets.model.events.ClockTick;
-import xyz.rjs.brandwatch.supermarkets.model.events.Customer;
-
-import java.util.Locale;
 
 public abstract class AbstractTickingService extends AbstractIdleService {
 
