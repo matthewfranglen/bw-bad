@@ -1,5 +1,7 @@
 package xyz.rjs.brandwatch.supermarkets.logistics.plugins.bad;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -88,14 +90,14 @@ public class Oracle {
 	 * holds the time range that will be searched.
 	 */
 	// 1s = 10^9ns
-	public static final long SEED_TIME_RANGE_NANOS = 1 * 1000L * 1000L * 1000L;
+	public static final long SEED_TIME_RANGE_NANOS = 1 * 50L * 1000L * 1000L;
 
 	/**
 	 * The Random object seed is based on a numerical value which changes every
 	 * time a Random object is created. This many values will be calculated
 	 * within which to search for a matching seed.
 	 */
-	public static final int SEED_UNIQUIFIER_VALUE_COUNT = 10;
+	private static final int SEED_UNIQUIFIER_VALUE_COUNT = 10;
 	/**
 	 * The Random object seed is based on a numerical value which changes every
 	 * time a Random object is created. This progression starts with this
@@ -113,15 +115,15 @@ public class Oracle {
 	 * time a Random object is created. This holds the calculated values to use
 	 * to search for the seed.
 	 */
-	private static final List<Long> seedUniquifierValues;
+	public static final List<Long> seedUniquifierValues;
 
 	static {
 		long value = SEED_UNIQUIFIER_INITIAL_VALUE;
 		seedUniquifierValues = new ArrayList<Long>();
 
 		for (int i = 0; i < SEED_UNIQUIFIER_VALUE_COUNT; i++) {
-			seedUniquifierValues.add(value);
 			value *= SEED_UNIQUIFIER_FACTOR;
+			seedUniquifierValues.add(value); // initial value is not used
 		}
 	}
 
@@ -136,79 +138,6 @@ public class Oracle {
 	private static final int SIZE_TRANSITION_LIMIT = 100;
 
 	/**
-	 * This holds the different states that the Oracle can move through.
-	 *
-	 * The Oracle has to deal with a very large potential space. This space also
-	 * shrinks rapidly but whill not shrink in a completely predictable way.
-	 * Finally the Oracle will fixate on a single value.
-	 *
-	 * Given that the requirements of each of these states is so different, it
-	 * makes sense to implement them as separate states.
-	 *
-	 * @author matthew
-	 */
-	private static enum ORACLE_STATE {
-		OPEN {
-
-			@Override
-			public long size(Oracle oracle) {
-				long denominator = oracle.calls.stream().reduce(1L, (accumulated, entry) -> accumulated * entry.bound, (a, b) -> a * b);
-
-				return (SeedGenerator.SEED_UNIQUIFIER_VALUE_COUNT * SeedGenerator.SEED_TIME_RANGE_NANOS) / denominator;
-			}
-
-			@Override
-			public void calledNextInt(Oracle oracle, int value, int bound) {
-				oracle.calls.add(new RandomCall(value, bound));
-
-				if (oracle.size() < SIZE_TRANSITION_LIMIT) {
-					oracle.calculateSeeds();
-				}
-			}
-		},
-		LIMITED {
-
-			@Override
-			public long size(Oracle oracle) {
-				return oracle.seeds.size();
-			}
-
-			@Override
-			public void calledNextInt(Oracle oracle, int value, int bound) {
-				oracle.reduceSeeds(new RandomCall(value, bound));
-			}
-		},
-		FIXED {
-
-			@Override
-			public long size(Oracle oracle) {
-				return 1;
-			}
-
-			@Override
-			public void calledNextInt(Oracle oracle, int value, int bound) {
-				oracle.calls.add(new RandomCall(value, bound));
-			}
-
-			@Override
-			public Random getRandom(Oracle oracle) {
-				Random result = new Random(oracle.fixedSeed);
-				oracle.calls.stream().forEachOrdered(e -> result.nextInt(e.bound));
-
-				return result;
-			}
-		};
-
-		abstract public long size(Oracle oracle);
-
-		abstract public void calledNextInt(Oracle oracle, int value, int bound);
-
-		public Random getRandom(Oracle oracle) {
-			throw new IllegalStateException("Oracle has not fixated");
-		}
-	}
-
-	/**
 	 * This holds the creation time of the Oracle. <strong>It is assumed that
 	 * the Random object has been created at or before this time.</strong>
 	 */
@@ -217,7 +146,7 @@ public class Oracle {
 	/**
 	 * This holds the list of calls to nextInt, in order.
 	 */
-	private final List<RandomCall> calls;
+	private final SeedTest calls;
 
 	/**
 	 * When seed resolution is attempted passing seeds are stored in this set.
@@ -230,12 +159,12 @@ public class Oracle {
 	 */
 	private long fixedSeed;
 
-	private ORACLE_STATE state;
+	private STATE state;
 
 	public Oracle() {
 		startingTime = System.nanoTime();
-		calls = new ArrayList<RandomCall>();
-		state = ORACLE_STATE.OPEN;
+		calls = new SeedTest();
+		state = STATE.OPEN;
 	}
 
 	/**
@@ -246,6 +175,7 @@ public class Oracle {
 	 * @param bound
 	 */
 	public void calledNextInt(int value, int bound) {
+		calls.add(r -> r.nextInt(bound) == value, bound);
 		state.calledNextInt(this, value, bound);
 	}
 
@@ -269,6 +199,10 @@ public class Oracle {
 		return state.getRandom(this);
 	}
 
+	private void setState(STATE state) {
+		this.state = state;
+	}
+
 	/**
 	 * This calculates the seeds from the starting range and uniquifiers and
 	 * filters them against the existing calls. The surviving seeds are stored
@@ -276,36 +210,95 @@ public class Oracle {
 	 */
 	private void calculateSeeds() {
 		seeds =
-			LongStream.iterate(startingTime - SEED_TIME_RANGE_NANOS, t -> t + 1)
-				.limit(SEED_TIME_RANGE_NANOS)
-				.flatMap(this::mapTimeToSeeds)
-				.filter(this::filterSeed)
+			LongStream.range(startingTime - SEED_TIME_RANGE_NANOS, startingTime + 1)
+				.flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u))
+				.parallel()
+				.filter(calls::test)
 				.mapToObj(seed -> seed)
 				.collect(Collectors.toSet());
 
-		if (seeds.size() > 1) {
-			state = ORACLE_STATE.LIMITED;
-		}
-		else {
-			state = ORACLE_STATE.FIXED;
-		}
+		checkState(! seeds.isEmpty(), "All available seeds eliminated, cannot continue");
 	}
 
-	private void reduceSeeds(RandomCall call) {
-		calls.add(call);
-		seeds = seeds.stream().filter(this::filterSeed).collect(Collectors.toSet());
+	private void reduceSeeds() {
+		seeds = seeds.stream()
+				.filter(calls::test)
+				.collect(Collectors.toSet());
+		checkState(! seeds.isEmpty(), "All available seeds eliminated, cannot continue");
+	}
 
-		if (seeds.size() <= 1) {
-			state = ORACLE_STATE.FIXED;
+	/**
+	 * This holds the different states that the Oracle can move through.
+	 *
+	 * The Oracle has to deal with a very large potential space. This space also
+	 * shrinks rapidly but whill not shrink in a completely predictable way.
+	 * Finally the Oracle will fixate on a single value.
+	 *
+	 * Given that the requirements of each of these states is so different, it
+	 * makes sense to implement them as separate states.
+	 *
+	 * @author matthew
+	 */
+	private static enum STATE {
+		OPEN {
+
+			@Override
+			public long size(Oracle oracle) {
+				return oracle.calls.estimatedSize(SeedGenerator.SEED_UNIQUIFIER_VALUE_COUNT * SeedGenerator.SEED_TIME_RANGE_NANOS);
+			}
+
+			@Override
+			public void calledNextInt(Oracle oracle, int value, int bound) {
+				if (oracle.size() < SIZE_TRANSITION_LIMIT) {
+					oracle.calculateSeeds();
+					if (oracle.seeds.size() > 1) {
+						oracle.setState(LIMITED);
+					}
+					else {
+						oracle.fixedSeed = oracle.seeds.iterator().next();
+						oracle.setState(FIXED);
+					}
+				}
+			}
+		},
+		LIMITED {
+
+			@Override
+			public long size(Oracle oracle) {
+				return oracle.seeds.size();
+			}
+
+			@Override
+			public void calledNextInt(Oracle oracle, int value, int bound) {
+				oracle.reduceSeeds();
+				if (oracle.seeds.size() == 1) {
+					oracle.fixedSeed = oracle.seeds.iterator().next();
+					oracle.setState(FIXED);
+				}
+			}
+		},
+		FIXED {
+
+			@Override
+			public long size(Oracle oracle) {
+				return 1;
+			}
+
+			@Override
+			public Random getRandom(Oracle oracle) {
+				Random result = new Random(oracle.fixedSeed);
+				checkState(oracle.calls.test(result), "Oracle fixed seed fails known tests");
+
+				return result;
+			}
+		};
+
+		abstract public long size(Oracle oracle);
+
+		public void calledNextInt(Oracle oracle, int value, int bound) {}
+
+		public Random getRandom(Oracle oracle) {
+			throw new IllegalStateException("Oracle has not fixated");
 		}
-	}
-
-	private boolean filterSeed(long seed) {
-		Random r = new Random(seed);
-		return calls.stream().allMatch(c -> c.test(r));
-	}
-
-	private LongStream mapTimeToSeeds(long time) {
-		return seedUniquifierValues.stream().mapToLong(u -> time * u);
 	}
 }
