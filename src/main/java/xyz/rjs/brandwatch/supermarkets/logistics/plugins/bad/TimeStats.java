@@ -47,6 +47,14 @@ public class TimeStats extends AbstractPlugin {
 	}
 
 	/**
+	 * Indicates the average across all durations.
+	 * @return
+	 */
+	public double average() {
+		return values.average();
+	}
+
+	/**
 	 * Indicates the confidence levels across all durations. This is the number
 	 * that will cover 95% of durations.
 	 * 
