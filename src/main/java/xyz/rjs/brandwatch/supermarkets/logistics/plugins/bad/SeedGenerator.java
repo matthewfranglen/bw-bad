@@ -1,15 +1,19 @@
 package xyz.rjs.brandwatch.supermarkets.logistics.plugins.bad;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-
+import java.util.stream.LongStream;
 
 /**
+ * This holds tests which can be applied to a range of potential seeds. The
+ * tests will exclude the seeds which do not produce the correct values.
+ * 
+ * This allows the seed that corresponds with the Random object generator to be
+ * determined, allowing a duplicate Random object to be produced.
+ * 
  * @author matthew
- *
  */
-class SeedGenerator implements Iterable<Long> {
+class SeedGenerator {
 
 	/**
 	 * The Random object seed is based on the current time. This class requires
@@ -17,7 +21,7 @@ class SeedGenerator implements Iterable<Long> {
 	 * holds the time range that will be searched.
 	 */
 	// 1s = 10^9ns
-	public static final long SEED_TIME_RANGE_NANOS = 1 * 1000L * 1000L * 1000L;
+	public static final long DEFAULT_SEED_TIME_RANGE_NANOS = 1 * 1000L * 1000L * 1000L;
 
 	/**
 	 * The Random object seed is based on a numerical value which changes every
@@ -42,17 +46,16 @@ class SeedGenerator implements Iterable<Long> {
 	 * time a Random object is created. This holds the calculated values to use
 	 * to search for the seed.
 	 */
-	private static final Long[] seedUniquifierValues;
+	public static final List<Long> seedUniquifierValues;
 
 	static {
 		long value = SEED_UNIQUIFIER_INITIAL_VALUE;
-		List<Long> values = new ArrayList<Long>();
+		seedUniquifierValues = new ArrayList<Long>();
 
 		for (int i = 0; i < SEED_UNIQUIFIER_VALUE_COUNT; i++) {
-			values.add(value);
 			value *= SEED_UNIQUIFIER_FACTOR;
+			seedUniquifierValues.add(value); // initial value is not used
 		}
-		seedUniquifierValues = values.toArray(new Long[SEED_UNIQUIFIER_VALUE_COUNT]);
 	}
 
 	/**
@@ -66,50 +69,34 @@ class SeedGenerator implements Iterable<Long> {
 	}
 
 	/**
+	 * This returns the seed search space.
 	 * @return
-	 * @see java.lang.Iterable#iterator()
 	 */
-	@Override
-	public Iterator<Long> iterator() {
-		return new SeedGeneratorIterator();
+	public long size() {
+		return DEFAULT_SEED_TIME_RANGE_NANOS * SEED_UNIQUIFIER_VALUE_COUNT;
 	}
 
-	private class SeedGeneratorIterator implements Iterator<Long> {
+	/**
+	 * This will create a stream of potential seeds. This looks back over the
+	 * last second.
+	 * 
+	 * @return
+	 */
+	public LongStream stream() {
+		return stream(DEFAULT_SEED_TIME_RANGE_NANOS);
+	}
 
-		private long time;
-		private int uniquifier;
-
-		public SeedGeneratorIterator() {
-			time = startingTime - SEED_TIME_RANGE_NANOS;
-			uniquifier = 0;
-		}
-
-		/**
-		 * @return
-		 * @see java.util.Iterator#hasNext()
-		 */
-		@Override
-		public boolean hasNext() {
-			return time < startingTime || uniquifier < seedUniquifierValues.length;
-		}
-
-		/**
-		 * @return
-		 * @see java.util.Iterator#next()
-		 */
-		@Override
-		public Long next() {
-			time++;
-			if (time > startingTime) {
-				uniquifier++;
-				time = startingTime - SEED_TIME_RANGE_NANOS;
-
-				if (uniquifier > seedUniquifierValues.length) {
-					throw new IllegalStateException();
-				}
-			}
-
-			return time * uniquifier;
-		}
+	/**
+	 * This will create a stream of potential seeds, looking as far back in time
+	 * as indicated.
+	 * 
+	 * One millisecond is one million nanoseconds (which is one billion
+	 * nanoseconds to the second).
+	 * 
+	 * @param timeRange - the time, in nanoseconds, to iterate through
+	 * @return
+	 */
+	public LongStream stream(long timeRange) {
+		return LongStream.range(startingTime - timeRange, startingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
 	}
 }

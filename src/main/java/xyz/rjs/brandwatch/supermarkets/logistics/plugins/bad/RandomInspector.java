@@ -9,6 +9,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * intent to use these to duplicate the values, but instead to use them to
  * determine if this is feasible at all.
  * 
+ * This is also very useful for testing.
+ * 
  * @author matthew
  */
 public class RandomInspector {
@@ -84,10 +86,32 @@ public class RandomInspector {
 		return (seed ^ SCRAMBLE_MULTIPLIER) & SCRAMBLE_MASK;
 	}
 
+	/**
+	 * This takes a seed and the uniquifier value that was used to produce it
+	 * and returns the original System.nanoTime that was used to produce it.
+	 * 
+	 * @param seed
+	 * @param uniquifier
+	 * @return
+	 */
 	public static long extractTime(long seed, long uniquifier) {
 		return (initialScramble(seed) ^ uniquifier) & SCRAMBLE_MASK;
 	}
 
+	/**
+	 * This takes the seed and uniquifier and uses them to produce a time. That
+	 * time is then differenced against the provided time (which is assumed to
+	 * be after the creation of the Random object).
+	 * 
+	 * This method exists because the Random constructor indirectly masks the
+	 * long value provided by System.nanoTime. If the mask is not applied to the
+	 * comparison time then the difference can be wildly wildly inaccurate.
+	 * 
+	 * @param seed
+	 * @param time
+	 * @param uniquifier
+	 * @return
+	 */
 	public static long extractTimeDifference(long seed, long time, long uniquifier) {
 		return (time & SCRAMBLE_MASK) - extractTime(seed, uniquifier);
 	}

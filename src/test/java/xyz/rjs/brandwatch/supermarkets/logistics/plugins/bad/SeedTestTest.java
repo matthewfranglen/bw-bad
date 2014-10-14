@@ -43,7 +43,7 @@ public class SeedTestTest {
 		assertTrue("Other seeds become invalid", !set.test(Long.MIN_VALUE));
 
 		List<Long> valid = LongStream.range(time - 1000, time + 1000)
-				.flatMap(v -> Oracle.seedUniquifierValues.stream().mapToLong(u -> v ^ u))
+				.flatMap(v -> SeedGenerator.seedUniquifierValues.stream().mapToLong(u -> v ^ u))
 				.filter(set::test)
 				.mapToObj(Long::new)
 				.collect(Collectors.toList());

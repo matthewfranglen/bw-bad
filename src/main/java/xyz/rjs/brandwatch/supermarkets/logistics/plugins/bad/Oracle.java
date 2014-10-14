@@ -2,20 +2,31 @@ package xyz.rjs.brandwatch.supermarkets.logistics.plugins.bad;
 
 import static com.google.common.base.Preconditions.checkState;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 
 /**
- * This predicts the values that java.util.Random objects will produce.
+ * This predicts the values that java.util.Random objects will produce based on
+ * observed values produced by those Random objects.
  * 
- * The Oracle can predict the future. Lucky for it, Random objects are
- * predictable.
+ * This will be used to predict the values that CustomerService and Supplier
+ * will generate. This will allow the prediction of the next sale and the next
+ * purchase price (and ones following that...).
+ * 
+ * It is not feasible to observe the Random objects that cause the
+ * CustomerService and Supplier to fire. They ARE observable when the value
+ * produced is below the threshold, but they ARE NOT observable when it is at or
+ * above the threshold. This means that any attempt to generate the seeds for
+ * them would have to rank the seeds instead of filtering them correctly.
+ * 
+ * (as I write this I realise that the negative status can be inferred from a
+ * tick that does not produce the given event, but this demonstrates the
+ * technique I want to show without having to cover that as well).
  *
- * The source code for java.util.Random creates randoms like so:
+ * Fundamentally this works because Java Random objects are predictable. They
+ * are designed to produce the same output when started with the same seed. The
+ * source code for java.util.Random creates randoms like so:
  *
  * <pre>
  * <code>
@@ -72,61 +83,6 @@ import java.util.stream.LongStream;
  */
 public class Oracle {
 
-	// NOTE: It seems that there are only 5 Random objects created in this (2x
-	// in CustomerService, 1x in Supermarket, 2x in Supplier)
-	// NOTE: Imports such as Fairy do create their own. The true number must be
-	// determined.
-	// NOTE: The delivery of an item from the warehouse also creates one.
-	// NOTE: (in general) the price starts at 1 which is as low as it can be, so
-	// buying everything at the start might be good
-	// NOTE: Crazy application of reflection might allow access to the
-	// underlying random objects for a really dirty oracle
-	// NOTE: Oh! Oh! https://stackoverflow.com/a/12784901 that could totally
-	// work
-
-	/**
-	 * The Random object seed is based on the current time. This class requires
-	 * that the Random object was created in the recent past. This variable
-	 * holds the time range that will be searched.
-	 */
-	// 1s = 10^9ns
-	public static final long SEED_TIME_RANGE_NANOS = 1 * 50L * 1000L * 1000L;
-
-	/**
-	 * The Random object seed is based on a numerical value which changes every
-	 * time a Random object is created. This many values will be calculated
-	 * within which to search for a matching seed.
-	 */
-	private static final int SEED_UNIQUIFIER_VALUE_COUNT = 10;
-	/**
-	 * The Random object seed is based on a numerical value which changes every
-	 * time a Random object is created. This progression starts with this
-	 * constant.
-	 */
-	private static final long SEED_UNIQUIFIER_INITIAL_VALUE = 8682522807148012L;
-	/**
-	 * The Random object seed is based on a numerical value which changes every
-	 * time a Random object is created. This progression involves multiplying
-	 * the current value with this constant.
-	 */
-	private static final long SEED_UNIQUIFIER_FACTOR = 181783497276652981L;
-	/**
-	 * The Random object seed is based on a numerical value which changes every
-	 * time a Random object is created. This holds the calculated values to use
-	 * to search for the seed.
-	 */
-	public static final List<Long> seedUniquifierValues;
-
-	static {
-		long value = SEED_UNIQUIFIER_INITIAL_VALUE;
-		seedUniquifierValues = new ArrayList<Long>();
-
-		for (int i = 0; i < SEED_UNIQUIFIER_VALUE_COUNT; i++) {
-			value *= SEED_UNIQUIFIER_FACTOR;
-			seedUniquifierValues.add(value); // initial value is not used
-		}
-	}
-
 	/**
 	 * The Random object seed could be one of many billions of values. It is
 	 * infeasible to store that many values and reduce them on each method call.
@@ -144,6 +100,12 @@ public class Oracle {
 	private final long startingTime;
 
 	/**
+	 * This holds the seed generator, which is used to generate the initial set
+	 * of seeds for the reduceSeeds method.
+	 */
+	private final SeedGenerator generator;
+
+	/**
 	 * This holds the list of calls to nextInt, in order.
 	 */
 	private final SeedTest calls;
@@ -155,14 +117,21 @@ public class Oracle {
 	private Set<Long> seeds;
 
 	/**
-	 * When seed resolution has completed the passing seed is stored in this variable.
+	 * When seed resolution has completed the passing seed is stored in this
+	 * variable.
 	 */
 	private long fixedSeed;
 
+	/**
+	 * This is the current state of the Oracle. The Oracle transitions from wild
+	 * guesstimates to a limited set of seeds before finally settling on a
+	 * single seed.
+	 */
 	private STATE state;
 
 	public Oracle() {
 		startingTime = System.nanoTime();
+		generator = new SeedGenerator(startingTime);
 		calls = new SeedTest();
 		state = STATE.OPEN;
 	}
@@ -199,32 +168,38 @@ public class Oracle {
 		return state.getRandom(this);
 	}
 
+	/**
+	 * Transition the state of the Oracle.
+	 * @param state
+	 */
 	private void setState(STATE state) {
 		this.state = state;
 	}
 
 	/**
 	 * This calculates the seeds from the starting range and uniquifiers and
-	 * filters them against the existing calls. The surviving seeds are stored
-	 * and the oracle transitions to the LIMITED state.
+	 * filters them against the existing calls. The surviving seeds are stored.
 	 */
 	private void calculateSeeds() {
-		seeds =
-			LongStream.range(startingTime - SEED_TIME_RANGE_NANOS, startingTime + 1)
-				.flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u))
-				.parallel()
-				.filter(calls::test)
-				.mapToObj(seed -> seed)
-				.collect(Collectors.toSet());
+		seeds = generator.stream().parallel().filter(calls::test).mapToObj(seed -> seed).collect(Collectors.toSet());
+		if (seeds.size() == 1) {
+			fixedSeed = seeds.iterator().next();
+		}
 
-		checkState(! seeds.isEmpty(), "All available seeds eliminated, cannot continue");
+		checkState(!seeds.isEmpty(), "All available seeds eliminated, cannot continue");
 	}
 
+	/**
+	 * This takes the available seeds and re-applies the calls to them. If more
+	 * calls are available then the number of valid seeds should drop.
+	 */
 	private void reduceSeeds() {
-		seeds = seeds.stream()
-				.filter(calls::test)
-				.collect(Collectors.toSet());
-		checkState(! seeds.isEmpty(), "All available seeds eliminated, cannot continue");
+		seeds = seeds.stream().filter(calls::test).collect(Collectors.toSet());
+		if (seeds.size() == 1) {
+			fixedSeed = seeds.iterator().next();
+		}
+
+		checkState(!seeds.isEmpty(), "All available seeds eliminated, cannot continue");
 	}
 
 	/**
@@ -240,27 +215,44 @@ public class Oracle {
 	 * @author matthew
 	 */
 	private static enum STATE {
+		/**
+		 * The OPEN state is when no attempt to filter the seeds has been
+		 * performed. At this point the size value is an estimate. When a new
+		 * call comes in which reduces the estimate below a transition
+		 * threshold, the seeds will be filtered and the Oracle will transition
+		 * into the next state.
+		 * 
+		 * The next state is likely to be LIMITED, but can be FIXED if only a
+		 * single seed passed the filter.
+		 */
 		OPEN {
 
 			@Override
 			public long size(Oracle oracle) {
-				return oracle.calls.estimatedSize(SeedGenerator.SEED_UNIQUIFIER_VALUE_COUNT * SeedGenerator.SEED_TIME_RANGE_NANOS);
+				return oracle.calls.estimatedSize(oracle.generator.size());
 			}
 
 			@Override
 			public void calledNextInt(Oracle oracle, int value, int bound) {
 				if (oracle.size() < SIZE_TRANSITION_LIMIT) {
+					// this checks for an empty seed set
 					oracle.calculateSeeds();
+
 					if (oracle.seeds.size() > 1) {
 						oracle.setState(LIMITED);
 					}
 					else {
-						oracle.fixedSeed = oracle.seeds.iterator().next();
 						oracle.setState(FIXED);
 					}
 				}
 			}
 		},
+		/**
+		 * The LIMITED state is when the seeds have been filtered and a limited
+		 * number remain. The set of seeds needs to be reduced to a single valid
+		 * seed. Each time a call comes in the set will be filtered. When a
+		 * final seed remains the Oracle will transition to the FIXED state.
+		 */
 		LIMITED {
 
 			@Override
@@ -271,12 +263,18 @@ public class Oracle {
 			@Override
 			public void calledNextInt(Oracle oracle, int value, int bound) {
 				oracle.reduceSeeds();
+
 				if (oracle.seeds.size() == 1) {
-					oracle.fixedSeed = oracle.seeds.iterator().next();
 					oracle.setState(FIXED);
 				}
 			}
 		},
+		/**
+		 * The FIXED state is when the seeds have been filtered to a single
+		 * value. At this point the Random object can be requested.
+		 * 
+		 * This is the only state that will return a size of 1.
+		 */
 		FIXED {
 
 			@Override
@@ -293,10 +291,46 @@ public class Oracle {
 			}
 		};
 
+		/**
+		 * Get the number of seeds that are still valid.
+		 * 
+		 * If this is below SIZE_TRANSITION_LIMIT then this is not an estimate.
+		 * If this is above or equal to that then it is probable it is an
+		 * estimate.
+		 * 
+		 * When this returns 1 getRandom can be called without error.
+		 * 
+		 * @param oracle
+		 * @return
+		 */
 		abstract public long size(Oracle oracle);
 
-		public void calledNextInt(Oracle oracle, int value, int bound) {}
+		/**
+		 * This provides the result of a call to nextInt on the Random object
+		 * under study. All seeds that the Oracle considers must match this
+		 * result.
+		 * 
+		 * This MUST be called in the correct order. This MUST be called once
+		 * for every call to nextInt made on the Random object.
+		 * 
+		 * @param oracle
+		 * @param value
+		 * @param bound
+		 */
+		public void calledNextInt(Oracle oracle, int value, int bound) {
+		}
 
+		/**
+		 * This will return the Random object from a fixated Oracle. An Oracle
+		 * has fixated if the size of it is 1.
+		 * 
+		 * The Random object provided will match the one under study if EVERY
+		 * call to nextInt has been recorded in the Oracle. This means you MUST
+		 * continue to call nextInt when new observed values are available.
+		 * 
+		 * @param oracle
+		 * @return
+		 */
 		public Random getRandom(Oracle oracle) {
 			throw new IllegalStateException("Oracle has not fixated");
 		}

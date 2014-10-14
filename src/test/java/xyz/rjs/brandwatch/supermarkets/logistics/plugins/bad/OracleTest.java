@@ -30,8 +30,8 @@ public class OracleTest {
 		long seed = RandomInspector.getSeed(random);
 		long seedUniquifier = RandomInspector.getSeedUniquifier(random);
 
-		assertTrue("Random uniquifier in set", Oracle.seedUniquifierValues.indexOf(seedUniquifier) >= 0);
-		assertTrue("Time within range", RandomInspector.extractTimeDifference(seed, System.nanoTime(), seedUniquifier) < Oracle.SEED_TIME_RANGE_NANOS);
+		assertTrue("Random uniquifier in set", SeedGenerator.seedUniquifierValues.indexOf(seedUniquifier) >= 0);
+		assertTrue("Time within range", RandomInspector.extractTimeDifference(seed, System.nanoTime(), seedUniquifier) < SeedGenerator.DEFAULT_SEED_TIME_RANGE_NANOS);
 
 		// 10B seed calculation = 650.324s
 		// 500M seed calculation = 36.779s
