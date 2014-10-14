@@ -2,6 +2,8 @@ package xyz.rjs.brandwatch.supermarkets.logistics.plugins.bad;
 
 import java.util.Random;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import xyz.rjs.brandwatch.supermarkets.logistics.plugins.AbstractPlugin;
@@ -16,6 +18,8 @@ import com.google.common.eventbus.Subscribe;
  */
 @Component
 public class PriceOracle extends AbstractPlugin {
+
+	private static final Logger logger = LoggerFactory.getLogger(PriceOracle.class);
 
 	private static final int PRICE_BOUND = 3;
 
@@ -40,6 +44,7 @@ public class PriceOracle extends AbstractPlugin {
 	public void priceListListener(PriceList list) {
 		// Get the Random.nextInt result by adding one
 		final int value = 1 + list.getCurrentPrice() - price;
+		final long originalSize = oracle.size();
 
 		if (price == 1 && value == 1) {
 			// When the price is 1 the price cannot go down. This means that the
@@ -50,5 +55,16 @@ public class PriceOracle extends AbstractPlugin {
 			oracle.calledNextInt(value, PRICE_BOUND);
 		}
 		price = list.getCurrentPrice();
+
+		if (originalSize > 1) {
+			final long size = oracle.size();
+
+			if (size == 1) {
+				logger.info("SaleOracle has fixated!");
+			}
+			else {
+				logger.info(String.format("SaleOracle (%d -> %d)", originalSize, size));
+			}
+		}
 	}
 }
