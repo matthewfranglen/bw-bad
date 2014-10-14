@@ -92,7 +92,7 @@ public class Oracle {
 	 * Oracle will switch from estimating the remaining space to tracking
 	 * individual seeds.
 	 */
-	private static final int SIZE_TRANSITION_LIMIT = 100;
+	public static final int SIZE_TRANSITION_LIMIT = 100;
 
 	/**
 	 * This holds the creation time of the Oracle. <strong>It is assumed that
@@ -242,7 +242,7 @@ public class Oracle {
 
 			@Override
 			public long size(Oracle oracle) {
-				return oracle.calls.estimatedSize(oracle.generator.size());
+				return oracle.calls.estimatedSize(SeedGenerator.size());
 			}
 
 			@Override

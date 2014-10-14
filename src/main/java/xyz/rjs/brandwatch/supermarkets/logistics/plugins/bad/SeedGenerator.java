@@ -72,7 +72,7 @@ class SeedGenerator {
 	 * This returns the seed search space.
 	 * @return
 	 */
-	public long size() {
+	public static long size() {
 		return DEFAULT_SEED_TIME_RANGE_NANOS * SEED_UNIQUIFIER_VALUE_COUNT;
 	}
 
