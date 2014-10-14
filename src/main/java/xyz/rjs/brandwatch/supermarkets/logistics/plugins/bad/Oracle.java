@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkState;
 
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -138,14 +139,26 @@ public class Oracle {
 
 	/**
 	 * This should be called when the random object has experienced a
-	 * nextInt(bound) call. The implementation
+	 * nextInt(bound) call.
 	 *
-	 * @param constraint
+	 * @param value
 	 * @param bound
 	 */
 	public void calledNextInt(int value, int bound) {
 		calls.add(r -> r.nextInt(bound) == value, bound);
-		state.calledNextInt(this, value, bound);
+		state.calledNextInt(this);
+	}
+
+	/**
+	 * This should be called when the random object has experienced a
+	 * method call which cannot be limited to a single value.
+	 *
+	 * @param call
+	 * @param bound
+	 */
+	public void calledNextInt(Function<Random, Boolean> call, int bound) {
+		calls.add(call, bound);
+		state.calledNextInt(this);
 	}
 
 	/**
@@ -233,7 +246,7 @@ public class Oracle {
 			}
 
 			@Override
-			public void calledNextInt(Oracle oracle, int value, int bound) {
+			public void calledNextInt(Oracle oracle) {
 				if (oracle.size() < SIZE_TRANSITION_LIMIT) {
 					// this checks for an empty seed set
 					oracle.calculateSeeds();
@@ -261,7 +274,7 @@ public class Oracle {
 			}
 
 			@Override
-			public void calledNextInt(Oracle oracle, int value, int bound) {
+			public void calledNextInt(Oracle oracle) {
 				oracle.reduceSeeds();
 
 				if (oracle.seeds.size() == 1) {
@@ -317,7 +330,7 @@ public class Oracle {
 		 * @param value
 		 * @param bound
 		 */
-		public void calledNextInt(Oracle oracle, int value, int bound) {
+		public void calledNextInt(Oracle oracle) {
 		}
 
 		/**
