@@ -136,12 +136,26 @@ public class BadPlugin extends AbstractPlugin {
 			stablePrice = this.price;
 		}
 
-		state.priceListener(this);
+		try {
+			state.priceListener(this);
+		}
+		catch (Exception e) {
+			logger.error("Failed to execute priceListener", e);
+		}
+		catch (Throwable e) { // OutOfMemoryError etc
+			logger.error("Critical failure to execute priceListener", e);
+			System.exit(1);
+		}
 	}
 
 	@Subscribe
 	public void tickListener(ClockTick tick) {
-		state.tickListener(this);
+		try {
+			state.tickListener(this);
+		}
+		catch (Exception e) {
+			logger.error("Failed to execute tickListener", e);
+		}
 	}
 
 	/**
