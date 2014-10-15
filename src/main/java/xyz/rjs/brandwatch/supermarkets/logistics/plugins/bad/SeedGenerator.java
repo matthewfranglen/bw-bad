@@ -80,25 +80,11 @@ class SeedGenerator {
 	 * This will create a stream of potential seeds. This looks back over the
 	 * last second.
 	 * 
+	 * @param batch - the batch of time to stream
 	 * @return
 	 */
-	public LongStream stream(long offset) {
-		return stream(offset, DEFAULT_SEED_TIME_RANGE_NANOS);
-	}
-
-	/**
-	 * This will create a stream of potential seeds, looking as far back in time
-	 * as indicated.
-	 * 
-	 * One millisecond is one million nanoseconds (which is one billion
-	 * nanoseconds to the second).
-	 * 
-	 * @param timeRange
-	 *            - the time, in nanoseconds, to iterate through
-	 * @return
-	 */
-	public LongStream stream(long offset, long range) {
-		final long effectiveStartingTime = startingTime - offset;
-		return LongStream.range(effectiveStartingTime - range, effectiveStartingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
+	public LongStream stream(int batch) {
+		final long effectiveStartingTime = startingTime - (batch * DEFAULT_SEED_TIME_RANGE_NANOS);
+		return LongStream.range(effectiveStartingTime - DEFAULT_SEED_TIME_RANGE_NANOS, effectiveStartingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
 	}
 }

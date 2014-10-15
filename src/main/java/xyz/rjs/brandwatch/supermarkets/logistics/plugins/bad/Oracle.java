@@ -279,7 +279,7 @@ public class Oracle {
 			logger.info(String.format("Performing round %s filter of %s seeds", formatter.format(round), formatter.format(SeedGenerator.size())));
 			long startTime = System.currentTimeMillis();
 
-			seeds = generator.stream(round * SeedGenerator.DEFAULT_SEED_TIME_RANGE_NANOS).parallel().filter(calls::test).mapToObj(seed -> seed).collect(Collectors.toSet());
+			seeds = generator.stream(round).parallel().filter(calls::test).mapToObj(seed -> seed).collect(Collectors.toSet());
 			round++;
 
 			logger.info(String.format("Filtering completed in %s ms, %s seeds remain", formatter.format(System.currentTimeMillis() - startTime),
