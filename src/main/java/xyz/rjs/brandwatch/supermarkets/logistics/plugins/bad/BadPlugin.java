@@ -178,7 +178,7 @@ public class BadPlugin extends AbstractPlugin {
 	private boolean isPriceRising() {
 		final Random pricesRandom = priceOracle.getRandom();
 
-		return pricesRandom.nextInt(3) == 2;
+		return pricesRandom.nextInt(3) == PriceOracle.RISING_PRICE_VALUE;
 	}
 
 	/**

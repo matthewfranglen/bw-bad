@@ -14,6 +14,7 @@ import com.google.common.eventbus.Subscribe;
 @Component
 public class PriceOracle extends OracleWrapper {
 
+	public static final int RISING_PRICE_VALUE = 0;
 	private static final int PRICE_BOUND = 3;
 
 	private int price;
@@ -21,17 +22,21 @@ public class PriceOracle extends OracleWrapper {
 	public PriceOracle() {
 		super(PRICE_BOUND);
 		price = 1;
+		calledNextInt(r -> { r.nextInt(10); return true; }); // The random object is called once during the initialization
 	}
 
 	@Subscribe
 	public void priceListListener(PriceList list) {
-		// Get the Random.nextInt result by adding one
-		final int value = 1 + list.getCurrentPrice() - price;
+		// The change is 1 - Random.nextInt(3).
+		// To reverse this we need the oldPrice - newPrice (the change) plus one:
+		// new_price = old_price + 1 - random
+		// random    = old_price + 1 - new_price
 
-		if (price == 1 && value == 1) {
-			// When the price is 1 the price cannot go down. This means that the
-			// value of 1 is ambiguous as it could be a 0 that was fixed.
-			calledNextInt(r -> r.nextInt(3) < 2);
+		final int value = price + 1 - list.getCurrentPrice();
+
+		if (price == 1 && list.getCurrentPrice() == 1) {
+			// When the price is 1 the price cannot go down. This means that the number can only not be 0.
+			calledNextInt(r -> r.nextInt(PRICE_BOUND) != RISING_PRICE_VALUE);
 		}
 		else {
 			calledNextInt(value);
