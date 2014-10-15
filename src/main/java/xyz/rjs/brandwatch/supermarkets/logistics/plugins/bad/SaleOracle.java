@@ -22,7 +22,8 @@ public class SaleOracle extends OracleWrapper {
 
 	@Subscribe
 	public void customerListener(Customer sale) {
-		// Get the Random.nextInt result by subtracting one
+		// random.nextInt(maxNeeded - minNeeded) + minNeeded
+		// Get the Random.nextInt(6) result by subtracting one
 		final int value = sale.getStuffNeeded() - 1;
 
 		calledNextInt(value);
