@@ -12,7 +12,7 @@ import java.util.stream.LongStream;
  * 
  * @author matthew
  */
-class SeedGenerator {
+public class SeedGenerator {
 
 	/**
 	 * The Random object seed is based on the current time. This class requires
@@ -27,7 +27,8 @@ class SeedGenerator {
 	 * time a Random object is created. This many values will be calculated
 	 * within which to search for a matching seed.
 	 */
-	public static final int SEED_UNIQUIFIER_VALUE_COUNT = 10;
+	// Testing has found that the Supplier is #9 and Customer Service is #11
+	public static final int SEED_UNIQUIFIER_VALUE_COUNT = 15;
 	/**
 	 * The Random object seed is based on a numerical value which changes every
 	 * time a Random object is created. This progression starts with this
@@ -73,7 +74,7 @@ class SeedGenerator {
 	 * @return
 	 */
 	public static long size() {
-		return DEFAULT_SEED_TIME_RANGE_NANOS * SEED_UNIQUIFIER_VALUE_COUNT;
+		return DEFAULT_SEED_TIME_RANGE_NANOS * SEED_UNIQUIFIER_VALUE_COUNT * 2;
 	}
 
 	/**
@@ -84,7 +85,16 @@ class SeedGenerator {
 	 * @return
 	 */
 	public LongStream stream(int batch) {
-		final long effectiveStartingTime = startingTime - (batch * DEFAULT_SEED_TIME_RANGE_NANOS);
+		long offset = batch * DEFAULT_SEED_TIME_RANGE_NANOS;
+		return LongStream.concat(backStream(offset), forwardStream(offset));
+	}
+
+	private LongStream backStream(long offset) {
+		final long effectiveStartingTime = startingTime - offset;
 		return LongStream.range(effectiveStartingTime - DEFAULT_SEED_TIME_RANGE_NANOS, effectiveStartingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
+	}
+	private LongStream forwardStream(long offset) {
+		final long effectiveStartingTime = startingTime + offset;
+		return LongStream.range(effectiveStartingTime, effectiveStartingTime + DEFAULT_SEED_TIME_RANGE_NANOS + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
 	}
 }
