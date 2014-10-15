@@ -372,8 +372,15 @@ public class Oracle {
 			}
 
 			@Override
-			public void tick(Oracle oracle) {
+			public void calledNextInt(Oracle oracle) {
 				oracle.processSeeds();
+			}
+
+			@Override
+			public void tick(Oracle oracle) {
+				if (oracle.seeds.isEmpty()) {
+					oracle.processSeeds();
+				}
 			}
 		},
 		/**
