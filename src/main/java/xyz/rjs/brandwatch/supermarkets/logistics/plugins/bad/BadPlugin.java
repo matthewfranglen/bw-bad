@@ -267,7 +267,7 @@ public class BadPlugin extends AbstractPlugin {
 			if (currentPrice <= price) {
 				break;
 			}
-			currentPrice += pricesRandom.nextInt(3) - 1;
+			currentPrice += 1 - pricesRandom.nextInt(3);
 		}
 
 		// If the saleCount was calculated with the confidence then the duration
@@ -380,6 +380,8 @@ public class BadPlugin extends AbstractPlugin {
 
 			@Override
 			void tickListener(BadPlugin plugin) {
+				plugin.predictShop();
+
 				if (plugin.price + 1 == PRICE_LIMIT && plugin.isPriceRising()) {
 					plugin.setState(PRE_OVERPRICE);
 				}
@@ -420,6 +422,11 @@ public class BadPlugin extends AbstractPlugin {
 				if (plugin.price < PRICE_LIMIT) {
 					plugin.setState(STABLE);
 				}
+			}
+
+			@Override
+			void tickListener(BadPlugin plugin) {
+				plugin.predictShop();
 			}
 		};
 
