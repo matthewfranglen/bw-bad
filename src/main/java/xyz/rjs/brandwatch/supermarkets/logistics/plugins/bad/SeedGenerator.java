@@ -22,6 +22,7 @@ class SeedGenerator {
 	 */
 	// 1s = 10^9ns
 	public static final long DEFAULT_SEED_TIME_RANGE_NANOS = 1 * 1000L * 1000L * 1000L;
+	public static final long DEFAULT_SEED_TIME_OFFSET_NANOS = 1 * 500L * 1000L * 1000L;
 
 	/**
 	 * The Random object seed is based on a numerical value which changes every
@@ -97,6 +98,7 @@ class SeedGenerator {
 	 * @return
 	 */
 	public LongStream stream(long timeRange) {
-		return LongStream.range(startingTime - timeRange, startingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
+		final long effectiveStartingTime = startingTime - DEFAULT_SEED_TIME_OFFSET_NANOS;
+		return LongStream.range(effectiveStartingTime - timeRange, effectiveStartingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
 	}
 }
