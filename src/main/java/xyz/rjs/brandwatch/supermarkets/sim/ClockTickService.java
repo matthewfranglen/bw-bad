@@ -1,17 +1,15 @@
 package xyz.rjs.brandwatch.supermarkets.sim;
 
-import com.google.common.eventbus.EventBus;
-import com.google.common.util.concurrent.AbstractScheduledService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import xyz.rjs.brandwatch.supermarkets.model.events.ClockTick;
-
 import java.util.concurrent.TimeUnit;
 
+import xyz.rjs.brandwatch.supermarkets.model.events.ClockTick;
+
+import com.google.common.eventbus.EventBus;
+import com.google.common.util.concurrent.AbstractScheduledService;
+
 public class ClockTickService extends AbstractScheduledService {
-    private Logger logger = LoggerFactory.getLogger(getClass());
     private int ticksPerSecond;
-    private EventBus eventBus;
+    private final EventBus eventBus;
 
     private volatile int ticks = 0;
 

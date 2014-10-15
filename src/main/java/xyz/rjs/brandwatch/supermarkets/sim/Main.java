@@ -1,18 +1,18 @@
 package xyz.rjs.brandwatch.supermarkets.sim;
 
-import com.google.common.util.concurrent.ServiceManager;
+import java.util.concurrent.TimeoutException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import com.google.common.util.concurrent.ServiceManager;
 
 @Component
 public class Main {
 
-    private Logger logger = LoggerFactory.getLogger(this.getClass());
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     public void runSimulation() {
         logger.info("Runnin");
