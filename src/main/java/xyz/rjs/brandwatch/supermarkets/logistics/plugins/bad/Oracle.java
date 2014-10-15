@@ -2,10 +2,15 @@ package xyz.rjs.brandwatch.supermarkets.logistics.plugins.bad;
 
 import static com.google.common.base.Preconditions.checkState;
 
+import java.text.DecimalFormat;
+import java.util.Collections;
 import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This predicts the values that java.util.Random objects will produce based on
@@ -84,6 +89,10 @@ import java.util.stream.Collectors;
  */
 public class Oracle {
 
+	private static final Logger logger = LoggerFactory.getLogger(Oracle.class);
+
+	private static final DecimalFormat formatter = new DecimalFormat("#,###");
+
 	/**
 	 * The Random object seed could be one of many billions of values. It is
 	 * infeasible to store that many values and reduce them on each method call.
@@ -93,6 +102,12 @@ public class Oracle {
 	 * individual seeds.
 	 */
 	public static final int SIZE_TRANSITION_LIMIT = 100;
+
+	/**
+	 * The number of additional calls the seed must pass before the Oracle
+	 * fixates on it.
+	 */
+	private static final int VALIDATION_ROUNDS = 10;
 
 	/**
 	 * This holds the creation time of the Oracle. <strong>It is assumed that
@@ -112,10 +127,26 @@ public class Oracle {
 	private final SeedTest calls;
 
 	/**
+	 * This holds the time offset for the next batch of seeds. The seeds are
+	 * generated in batches which are then tested. Each time a complete batch
+	 * fails the next batch of seeds is generated, offset from the current time
+	 * by a larger amount.
+	 */
+	private long seedOffset;
+
+	/**
 	 * When seed resolution is attempted passing seeds are stored in this set.
 	 * When this has only a single value the Random object can be generated.
 	 */
 	private Set<Long> seeds;
+
+	/**
+	 * This tracks the current round of validation for the single seed that
+	 * remains. When a single seed out of a batch remains the validation starts.
+	 * The validation tests the remaining seed with additional calls to ensure
+	 * that it is accurate.
+	 */
+	private int validationRound;
 
 	/**
 	 * When seed resolution has completed the passing seed is stored in this
@@ -134,6 +165,9 @@ public class Oracle {
 		startingTime = System.nanoTime();
 		generator = new SeedGenerator(startingTime);
 		calls = new SeedTest();
+		seeds = Collections.emptySet();
+		seedOffset = 0;
+		validationRound = 0;
 		state = STATE.OPEN;
 	}
 
@@ -145,20 +179,32 @@ public class Oracle {
 	 * @param bound
 	 */
 	public void calledNextInt(int value, int bound) {
-		calls.add(r -> r.nextInt(bound) == value, bound);
-		state.calledNextInt(this);
+		calledNextInt(r -> r.nextInt(bound) == value, bound);
 	}
 
 	/**
-	 * This should be called when the random object has experienced a
-	 * method call which cannot be limited to a single value.
+	 * This should be called when the random object has experienced a method
+	 * call which cannot be limited to a single value.
 	 *
 	 * @param call
 	 * @param bound
 	 */
 	public void calledNextInt(Function<Random, Boolean> call, int bound) {
-		calls.add(call, bound);
-		state.calledNextInt(this);
+		try {
+			long originalSize = size();
+
+			calls.add(call, bound);
+			state.calledNextInt(this);
+
+			logger.info(String.format("Contracted from %s to %s", formatter.format(originalSize), formatter.format(size())));
+		}
+		catch (Exception e) {
+			logger.error("Failed to add call", e);
+		}
+		catch (Throwable e) {
+			logger.error("Catastrophic error when adding call", e);
+			System.exit(1);
+		}
 	}
 
 	/**
@@ -166,6 +212,13 @@ public class Oracle {
 	 */
 	public long size() {
 		return state.size(this);
+	}
+
+	/**
+	 * @return - if the oracle has fixated on a single seed.
+	 */
+	public boolean isFixed() {
+		return state == STATE.FIXED;
 	}
 
 	/**
@@ -183,10 +236,30 @@ public class Oracle {
 
 	/**
 	 * Transition the state of the Oracle.
+	 * 
 	 * @param state
 	 */
 	private void setState(STATE state) {
+		logger.info(String.format("STATE TRANSITION: %s to %s", this.state, state));
+
 		this.state = state;
+	}
+
+	/**
+	 * Performs work to determine the matching seed.
+	 */
+	private void processSeeds() {
+		if (seeds.isEmpty()) {
+			calculateSeeds();
+		}
+		else {
+			reduceSeeds();
+		}
+
+		if (seeds.size() == 1) {
+			validationRound = 0;
+			setState(STATE.VALIDATING);
+		}
 	}
 
 	/**
@@ -194,12 +267,23 @@ public class Oracle {
 	 * filters them against the existing calls. The surviving seeds are stored.
 	 */
 	private void calculateSeeds() {
-		seeds = generator.stream().parallel().filter(calls::test).mapToObj(seed -> seed).collect(Collectors.toSet());
-		if (seeds.size() == 1) {
-			fixedSeed = seeds.iterator().next();
-		}
+		try {
+			logger.info(String.format("Performing initial filter of %s seeds", formatter.format(SeedGenerator.size())));
+			long startTime = System.currentTimeMillis();
 
-		checkState(!seeds.isEmpty(), "All available seeds eliminated, cannot continue");
+			seeds = generator.stream(seedOffset).parallel().filter(calls::test).mapToObj(seed -> seed).collect(Collectors.toSet());
+			seedOffset += SeedGenerator.DEFAULT_SEED_TIME_RANGE_NANOS;
+
+			logger.info(String.format("Filtering completed in %s ms, %s seeds remain", formatter.format(System.currentTimeMillis() - startTime),
+					formatter.format(seeds.size())));
+		}
+		catch (Exception e) {
+			logger.error("Failed to calculate seeds", e);
+		}
+		catch (Throwable e) {
+			logger.error("Catastrophic error when calculating seeds", e);
+			System.exit(1);
+		}
 	}
 
 	/**
@@ -207,12 +291,22 @@ public class Oracle {
 	 * calls are available then the number of valid seeds should drop.
 	 */
 	private void reduceSeeds() {
-		seeds = seeds.stream().filter(calls::test).collect(Collectors.toSet());
-		if (seeds.size() == 1) {
-			fixedSeed = seeds.iterator().next();
-		}
+		try {
+			logger.info(String.format("Performing reduction of %s seeds", formatter.format(seeds.size())));
+			long startTime = System.currentTimeMillis();
 
-		checkState(!seeds.isEmpty(), "All available seeds eliminated, cannot continue");
+			seeds = seeds.stream().filter(calls::test).collect(Collectors.toSet());
+
+			logger.info(String.format("Reduction completed in %s ms, %s seeds remain", formatter.format(System.currentTimeMillis() - startTime),
+					formatter.format(seeds.size())));
+		}
+		catch (Exception e) {
+			logger.error("Failed to reduce seeds", e);
+		}
+		catch (Throwable e) {
+			logger.error("Catastrophic error when reducing seeds", e);
+			System.exit(1);
+		}
 	}
 
 	/**
@@ -248,14 +342,10 @@ public class Oracle {
 			@Override
 			public void calledNextInt(Oracle oracle) {
 				if (oracle.size() < SIZE_TRANSITION_LIMIT) {
-					// this checks for an empty seed set
-					oracle.calculateSeeds();
+					oracle.processSeeds();
 
 					if (oracle.seeds.size() > 1) {
 						oracle.setState(LIMITED);
-					}
-					else {
-						oracle.setState(FIXED);
 					}
 				}
 			}
@@ -275,10 +365,40 @@ public class Oracle {
 
 			@Override
 			public void calledNextInt(Oracle oracle) {
+				oracle.processSeeds();
+			}
+		},
+		/**
+		 * The VALIDATING state is when the seeds have been filtered down to 1
+		 * and additional values are being used to verify that single seed. If
+		 * the seed makes it through the additional tests then the Oracle will
+		 * transition to the FIXED state and can produce cloned Random objects.
+		 * If the seed fails then the Oracle will return to the LIMITED state.
+		 * 
+		 * The Oracle does not return to the OPEN state because enough calls
+		 * exist to filter the next batch immediately.
+		 */
+		VALIDATING {
+
+			@Override
+			public long size(Oracle oracle) {
+				return 1;
+			}
+
+			@Override
+			public void calledNextInt(Oracle oracle) {
 				oracle.reduceSeeds();
 
-				if (oracle.seeds.size() == 1) {
-					oracle.setState(FIXED);
+				if (oracle.seeds.isEmpty()) {
+					oracle.setState(LIMITED);
+				}
+				else if (oracle.seeds.size() == 1) {
+					if (oracle.validationRound >= VALIDATION_ROUNDS) {
+						oracle.setState(FIXED);
+					}
+					else {
+						oracle.validationRound++;
+					}
 				}
 			}
 		},

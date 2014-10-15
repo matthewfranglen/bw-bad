@@ -5,11 +5,10 @@ import java.util.List;
 import java.util.stream.LongStream;
 
 /**
- * This holds tests which can be applied to a range of potential seeds. The
- * tests will exclude the seeds which do not produce the correct values.
- * 
- * This allows the seed that corresponds with the Random object generator to be
- * determined, allowing a duplicate Random object to be produced.
+ * This can generate a LongStream of potential seeds. This takes a time range to
+ * generate them over, and uses an initial set of uniquifier values. The first
+ * few Random objects created during an execution have starting seeds which are
+ * in this pool of potential seeds.
  * 
  * @author matthew
  */
@@ -21,8 +20,7 @@ class SeedGenerator {
 	 * holds the time range that will be searched.
 	 */
 	// 1s = 10^9ns
-	public static final long DEFAULT_SEED_TIME_RANGE_NANOS = 1 * 1000L * 1000L * 1000L;
-	public static final long DEFAULT_SEED_TIME_OFFSET_NANOS = 1 * 500L * 1000L * 1000L;
+	public static final long DEFAULT_SEED_TIME_RANGE_NANOS = 1 * 10L * 1000L * 1000L;
 
 	/**
 	 * The Random object seed is based on a numerical value which changes every
@@ -71,6 +69,7 @@ class SeedGenerator {
 
 	/**
 	 * This returns the seed search space.
+	 * 
 	 * @return
 	 */
 	public static long size() {
@@ -83,8 +82,8 @@ class SeedGenerator {
 	 * 
 	 * @return
 	 */
-	public LongStream stream() {
-		return stream(DEFAULT_SEED_TIME_RANGE_NANOS);
+	public LongStream stream(long offset) {
+		return stream(offset, DEFAULT_SEED_TIME_RANGE_NANOS);
 	}
 
 	/**
@@ -94,11 +93,12 @@ class SeedGenerator {
 	 * One millisecond is one million nanoseconds (which is one billion
 	 * nanoseconds to the second).
 	 * 
-	 * @param timeRange - the time, in nanoseconds, to iterate through
+	 * @param timeRange
+	 *            - the time, in nanoseconds, to iterate through
 	 * @return
 	 */
-	public LongStream stream(long timeRange) {
-		final long effectiveStartingTime = startingTime - DEFAULT_SEED_TIME_OFFSET_NANOS;
-		return LongStream.range(effectiveStartingTime - timeRange, effectiveStartingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
+	public LongStream stream(long offset, long range) {
+		final long effectiveStartingTime = startingTime - offset;
+		return LongStream.range(effectiveStartingTime - range, effectiveStartingTime + 1).flatMap(t -> seedUniquifierValues.stream().mapToLong(u -> t ^ u));
 	}
 }
