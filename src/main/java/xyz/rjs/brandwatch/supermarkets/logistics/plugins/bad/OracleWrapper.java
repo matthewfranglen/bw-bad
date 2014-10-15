@@ -4,6 +4,9 @@ import java.util.Random;
 import java.util.function.Function;
 
 import xyz.rjs.brandwatch.supermarkets.logistics.plugins.AbstractPlugin;
+import xyz.rjs.brandwatch.supermarkets.model.events.ClockTick;
+
+import com.google.common.eventbus.Subscribe;
 
 
 /**
@@ -27,6 +30,11 @@ public class OracleWrapper extends AbstractPlugin {
 
 	public Random getRandom() {
 		return oracle.getRandom();
+	}
+
+	@Subscribe
+	public void tickListener(ClockTick tick) {
+		oracle.tick();
 	}
 
 	protected void calledNextInt(Function<Random, Boolean> call) {

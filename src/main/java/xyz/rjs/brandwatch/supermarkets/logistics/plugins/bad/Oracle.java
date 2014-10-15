@@ -208,6 +208,14 @@ public class Oracle {
 	}
 
 	/**
+	 * A method which can be called to allow the Oracle to search the available
+	 * seed space.
+	 */
+	public void tick() {
+		state.tick(this);
+	}
+
+	/**
 	 * @return - the number of valid seeds left.
 	 */
 	public long size() {
@@ -364,7 +372,7 @@ public class Oracle {
 			}
 
 			@Override
-			public void calledNextInt(Oracle oracle) {
+			public void tick(Oracle oracle) {
 				oracle.processSeeds();
 			}
 		},
@@ -451,6 +459,13 @@ public class Oracle {
 		 * @param bound
 		 */
 		public void calledNextInt(Oracle oracle) {
+		}
+
+		/**
+		 * This provides the ability to perform a unit of work related to
+		 * searching for the seed.
+		 */
+		public void tick(Oracle oracle) {
 		}
 
 		/**
