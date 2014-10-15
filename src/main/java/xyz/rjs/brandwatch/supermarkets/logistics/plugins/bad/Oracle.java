@@ -107,7 +107,7 @@ public class Oracle {
 	 * The number of additional calls the seed must pass before the Oracle
 	 * fixates on it.
 	 */
-	private static final int VALIDATION_ROUNDS = 10;
+	private static final int VALIDATION_ROUNDS = 25;
 
 	/**
 	 * This holds the creation time of the Oracle. <strong>It is assumed that
