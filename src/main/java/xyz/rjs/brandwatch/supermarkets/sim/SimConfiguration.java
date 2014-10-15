@@ -1,13 +1,15 @@
 package xyz.rjs.brandwatch.supermarkets.sim;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.eventbus.EventBus;
-import com.google.common.util.concurrent.ServiceManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+
 import xyz.rjs.brandwatch.supermarkets.logistics.LogisticsConfiguration;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.eventbus.EventBus;
+import com.google.common.util.concurrent.ServiceManager;
 
 @Configuration
 @Import(LogisticsConfiguration.class)
