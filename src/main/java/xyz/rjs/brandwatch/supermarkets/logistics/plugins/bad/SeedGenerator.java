@@ -20,7 +20,7 @@ public class SeedGenerator {
 	 * holds the time range that will be searched.
 	 */
 	// 1s = 10^9ns
-	public static final long DEFAULT_SEED_TIME_RANGE_NANOS = 1 * 10L * 1000L * 1000L;
+	public static final long DEFAULT_SEED_TIME_RANGE_NANOS = 1 * 5L * 1000L * 1000L;
 
 	/**
 	 * The Random object seed is based on a numerical value which changes every
@@ -28,7 +28,7 @@ public class SeedGenerator {
 	 * within which to search for a matching seed.
 	 */
 	// Testing has found that the Supplier is #9 and Customer Service is #11
-	public static final int SEED_UNIQUIFIER_VALUE_COUNT = 15;
+	public static final int SEED_UNIQUIFIER_VALUE_COUNT = 20;
 	/**
 	 * The Random object seed is based on a numerical value which changes every
 	 * time a Random object is created. This progression starts with this
@@ -74,7 +74,7 @@ public class SeedGenerator {
 	 * @return
 	 */
 	public static long size() {
-		return DEFAULT_SEED_TIME_RANGE_NANOS * SEED_UNIQUIFIER_VALUE_COUNT * 2;
+		return DEFAULT_SEED_TIME_RANGE_NANOS * SEED_UNIQUIFIER_VALUE_COUNT;
 	}
 
 	/**
@@ -85,8 +85,13 @@ public class SeedGenerator {
 	 * @return
 	 */
 	public LongStream stream(int batch) {
-		long offset = batch * DEFAULT_SEED_TIME_RANGE_NANOS;
-		return LongStream.concat(backStream(offset), forwardStream(offset));
+		long offset = (batch / 2) * DEFAULT_SEED_TIME_RANGE_NANOS;
+		if (batch % 2 == 0) {
+			return backStream(offset);
+		}
+		else {
+			return forwardStream(offset);
+		}
 	}
 
 	private LongStream backStream(long offset) {
