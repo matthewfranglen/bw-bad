@@ -127,12 +127,12 @@ public class Oracle {
 	private final SeedTest calls;
 
 	/**
-	 * This holds the time offset for the next batch of seeds. The seeds are
-	 * generated in batches which are then tested. Each time a complete batch
-	 * fails the next batch of seeds is generated, offset from the current time
-	 * by a larger amount.
+	 * This holds the current evaluation round. The seeds are generated in
+	 * batches which are then tested. Each time a complete batch fails the next
+	 * batch of seeds is generated, offset from the current time by a larger
+	 * amount.
 	 */
-	private long seedOffset;
+	private int round;
 
 	/**
 	 * When seed resolution is attempted passing seeds are stored in this set.
@@ -166,7 +166,7 @@ public class Oracle {
 		generator = new SeedGenerator(startingTime);
 		calls = new SeedTest();
 		seeds = Collections.emptySet();
-		seedOffset = 0;
+		round = 0;
 		validationRound = 0;
 		state = STATE.OPEN;
 	}
@@ -276,11 +276,11 @@ public class Oracle {
 	 */
 	private void calculateSeeds() {
 		try {
-			logger.info(String.format("Performing initial filter of %s seeds", formatter.format(SeedGenerator.size())));
+			logger.info(String.format("Performing round %s filter of %s seeds", formatter.format(round), formatter.format(SeedGenerator.size())));
 			long startTime = System.currentTimeMillis();
 
-			seeds = generator.stream(seedOffset).parallel().filter(calls::test).mapToObj(seed -> seed).collect(Collectors.toSet());
-			seedOffset += SeedGenerator.DEFAULT_SEED_TIME_RANGE_NANOS;
+			seeds = generator.stream(round * SeedGenerator.DEFAULT_SEED_TIME_RANGE_NANOS).parallel().filter(calls::test).mapToObj(seed -> seed).collect(Collectors.toSet());
+			round++;
 
 			logger.info(String.format("Filtering completed in %s ms, %s seeds remain", formatter.format(System.currentTimeMillis() - startTime),
 					formatter.format(seeds.size())));
