@@ -38,7 +38,7 @@ public class OracleWrapper extends AbstractPlugin {
 	}
 
 	protected void calledNextInt(Function<Random, Boolean> call) {
-		oracle.calledNextInt(call, bound);
+		oracle.calledNextInt(call, 1);
 	}
 
 	protected void calledNextInt(int value) {
