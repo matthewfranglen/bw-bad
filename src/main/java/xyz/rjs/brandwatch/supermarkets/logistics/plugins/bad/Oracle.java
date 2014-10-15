@@ -191,12 +191,10 @@ public class Oracle {
 	 */
 	public void calledNextInt(Function<Random, Boolean> call, int bound) {
 		try {
-			long originalSize = size();
-
 			calls.add(call, bound);
-			state.calledNextInt(this);
-
-			logger.info(String.format("Contracted from %s to %s", formatter.format(originalSize), formatter.format(size())));
+			if (bound > 1) {
+				state.calledNextInt(this);
+			}
 		}
 		catch (Exception e) {
 			logger.error("Failed to add call", e);
