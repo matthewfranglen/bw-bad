@@ -2,7 +2,7 @@ package xyz.rjs.brandwatch.supermarkets.logistics.plugins.bad;
 
 import org.springframework.stereotype.Component;
 
-import xyz.rjs.brandwatch.supermarkets.model.events.Sale;
+import xyz.rjs.brandwatch.supermarkets.model.events.Customer;
 
 import com.google.common.eventbus.Subscribe;
 
@@ -21,9 +21,9 @@ public class SaleOracle extends OracleWrapper {
 	}
 
 	@Subscribe
-	public void saleListener(Sale sale) {
+	public void customerListener(Customer sale) {
 		// Get the Random.nextInt result by subtracting one
-		final int value = sale.getAmountSold() - 1;
+		final int value = sale.getStuffNeeded() - 1;
 
 		calledNextInt(value);
 	}
