@@ -46,7 +46,7 @@ public class OracleWrapper extends AbstractPlugin {
 		if (originalSize > Oracle.SIZE_TRANSITION_LIMIT && predictedSize < Oracle.SIZE_TRANSITION_LIMIT) {
 			logger.info(String.format(
 					"The Oracle has completed the calculation!\n%s ms for %s seeds",
-					formatter.format(originalTime - System.currentTimeMillis()),
+					formatter.format(System.currentTimeMillis() - originalTime),
 					formatter.format(SeedGenerator.size())
 				));
 		}
