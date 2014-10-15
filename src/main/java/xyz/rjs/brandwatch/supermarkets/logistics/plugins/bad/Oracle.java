@@ -249,6 +249,9 @@ public class Oracle {
 		logger.info(String.format("STATE TRANSITION: %s to %s", this.state, state));
 
 		this.state = state;
+		if (state == STATE.FIXED) {
+			fixedSeed = seeds.iterator().next();
+		}
 	}
 
 	/**
