@@ -209,10 +209,19 @@ public class BadPlugin extends AbstractPlugin {
 	 * Restocks the shop that makes the sales.
 	 */
 	private void stockShop() {
-		if (shop.getStock() < DESIRED_SHOP_STOCK && warehouse.getStock() > 0) {
-			int volume = Math.min(DESIRED_SHOP_STOCK - shop.getStock(), warehouse.getStock());
+		stockShop(DESIRED_SHOP_STOCK);
+	}
+
+	/**
+	 * Restocks the shop that makes the sales.
+	 */
+	private void stockShop(final int stock) {
+		final int shopStock = shop.getStock(), warehouseStock = warehouse.getStock();
+
+		if (shopStock < stock && warehouseStock > 0) {
+			int volume = Math.min(stock - shopStock, warehouseStock);
 			shop.addStock(volume);
-			warehouse.setStock(warehouse.getStock() - volume);
+			warehouse.setStock(warehouseStock - volume);
 		}
 	}
 
@@ -223,11 +232,7 @@ public class BadPlugin extends AbstractPlugin {
 		final Random sales = saleOracle.getRandom();
 		final int stock = 2 + sales.nextInt(6) + sales.nextInt(6);
 
-		if (shop.getStock() < stock && warehouse.getStock() > 0) {
-			int volume = Math.min(stock - shop.getStock(), warehouse.getStock());
-			shop.addStock(volume);
-			warehouse.setStock(warehouse.getStock() - volume);
-		}
+		stockShop(stock);
 	}
 
 	/**
